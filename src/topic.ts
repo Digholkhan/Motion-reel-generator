@@ -1,11 +1,15 @@
 export type Scene = {
+  id?: string;
   start: number;
   end: number;
   title: string;
+  durationInSeconds?: number;
+  visualType?: import('./storyboard').VisualType;
 };
 
 export type TopicConfig = {
   title: string;
+  prompt?: string;
   durationInSeconds: number;
   fps: number;
   width: number;
@@ -18,6 +22,7 @@ export type TopicConfig = {
   logoText: string;
   visualLabels: string[];
   motionSeed: number;
+  visualVariant: 'orbit' | 'cards' | 'waves' | 'focus';
   scenes: Scene[];
   htmlCode: string;
   cssCode: string;
@@ -42,6 +47,7 @@ export const topic: TopicConfig = {
   logoText: 'MM',
   visualLabels: ['HTML', 'CSS', 'JS'],
   motionSeed: 17,
+  visualVariant: 'orbit',
   scenes: [
     {start: 0, end: 3, title: 'A WEBSITE HAS 3 SUPERPOWERS'},
     {start: 3, end: 9, title: 'HTML = STRUCTURE'},

@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {Player} from '@remotion/player';
 import {FrontendInMotion} from '../FrontendInMotion';
 import {topic as initialTopic, type TopicConfig} from '../topic';
+import {createStoryboard} from '../storyboard';
 
 const cloneTopic = (): TopicConfig => ({
   ...initialTopic,
@@ -18,6 +19,9 @@ const autoPromptForTitle = (title: string) =>
 const hashTitle = (value: string) =>
   [...value].reduce((hash, character) => ((hash * 31) + character.charCodeAt(0)) >>> 0, 7);
 
+const hashPrompt = (title: string, prompt: string) =>
+  hashTitle(`${title}|${prompt}|${Date.now()}|${Math.random()}`);
+
 const paletteFor = (seed: number) => {
   const palettes = [
     {blue: '#168BFF', purple: '#8B5CF6', background: '#080D1C'},
@@ -27,6 +31,8 @@ const paletteFor = (seed: number) => {
   ];
   return palettes[seed % palettes.length];
 };
+
+const variants = ['orbit', 'cards', 'waves', 'focus'] as const;
 
 const shortLabel = (value: string) => value.replace(/[^a-z0-9 ]/gi, '').trim().split(/\s+/).slice(0, 2).map((word) => word.slice(0, 5)).join(' ').toUpperCase() || 'TOPIC';
 
@@ -40,36 +46,39 @@ const titleFromPrompt = (prompt: string, fallbackTitle = initialTopic.title) => 
 const topicFromPrompt = (prompt: string, fallbackTitle: string, base: TopicConfig): TopicConfig => {
   const next = cloneTopic();
   const title = prompt.trim() ? titleFromPrompt(prompt, fallbackTitle) : fallbackTitle.trim() || initialTopic.title;
+  const storyboard = createStoryboard(prompt.trim() || title, base);
   next.title = title;
-  const seed = hashTitle(title);
+  next.prompt = prompt.trim() || title;
+  const seed = hashPrompt(title, prompt);
   const palette = paletteFor(seed);
   next.motionSeed = seed;
+  next.visualVariant = variants[seed % variants.length];
   next.colors = {...next.colors, blue: palette.blue, purple: palette.purple};
   next.background = palette.background;
   next.logoText = shortLabel(title).replace(/\s/g, '').slice(0, 4);
-  next.visualLabels = [shortLabel(title), 'BUILD', 'SHIP'];
+  const labels = shortLabel(title).split(' ');
+  next.visualLabels = [labels[0] || 'TOPIC', labels[1] || 'IDEA', ['BUILD', 'MAKE', 'SHARE', 'GROW'][seed % 4]];
   next.series = base.series;
   next.creator = base.creator;
   next.tagline = base.tagline;
   next.audio = {...base.audio};
-  next.scenes = next.scenes.map((scene, index) =>
-    index === 0 ? {...scene, title: `${next.title.toUpperCase()} IN MOTION`} :
-    index === 1 ? {...scene, title: `${shortLabel(title)} = THE FOUNDATION`} :
-    index === 2 ? {...scene, title: `${shortLabel(title)} = THE EXPERIENCE`} :
-    index === 3 ? {...scene, title: `${shortLabel(title)} = THE RESULT`} :
-    scene,
-    );
-  next.htmlCode = `<h1>${next.title}</h1>\n<p>Build with clarity.</p>\n<button>Start learning</button>`;
-  next.cssCode = `button {\n  background: linear-gradient(90deg, #168BFF, #8B5CF6);\n  border-radius: 12px;\n  color: white;\n}`;
-  next.javascriptCode = `const button = document.querySelector('button');\nbutton.addEventListener('click', () => {\n  button.textContent = 'You clicked!';\n});`;
+  next.scenes = storyboard.scenes;
+  const examples = [
+    ['Explore', 'Practice', 'Share'],
+    ['Notice', 'Connect', 'Create'],
+    ['Plan', 'Build', 'Improve'],
+    ['Read', 'Try', 'Repeat'],
+  ][seed % 4];
+  next.htmlCode = `<section class="lesson">\n  <h1>${next.title}</h1>\n  <button>${examples[0]}</button>\n</section>`;
+  next.cssCode = `.lesson {\n  background: linear-gradient(135deg, ${palette.blue}, ${palette.purple});\n  border-radius: ${12 + (seed % 16)}px;\n  padding: ${16 + (seed % 18)}px;\n}`;
+  next.javascriptCode = `const action = document.querySelector('button');\naction.addEventListener('click', () => {\n  action.textContent = '${examples[1]} complete!';\n});`;
   next.quiz = {
-    question: `Which idea is central to ${next.title}?`,
-    options: ['A. Structure', 'B. Style', 'C. Interaction'],
-    answer: 'C. Interaction',
+    question: `What is the best first step for ${next.title}?`,
+    options: [`A. ${examples[0]}`, `B. ${examples[1]}`, `C. ${examples[2]}`],
+    answer: `C. ${examples[2]}`,
   };
-  next.caption = `${next.title}. Learn the idea, build the example, and keep moving forward.`;
+  next.caption = `${next.title}. ${examples.join(', ')} and keep moving forward.`;
   next.hashtags = [`#FrontendInMotion`, `#${next.title.replace(/[^a-z0-9]/gi, '')}`, '#WebDevelopment'];
-  next.background = base.background;
   return next;
 };
 
@@ -167,7 +176,7 @@ function App() {
           <label>Topic title<input value={titleInput} onChange={(event) => setTitleInput(event.target.value)} /></label>
           <label>Prompt <span className="label-help">optional · auto-created from title when empty</span><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={autoPromptForTitle(titleInput || initialTopic.title)} rows={4} /></label>
           <button className="primary-button" onClick={handlePrompt}>Generate from prompt <span>→</span></button>
-          <p className="generated-prompt"><span>Generated lesson prompt:</span> {prompt.trim() || autoPromptForTitle(titleInput || initialTopic.title)}</p>
+          <p className="generated-prompt"><span>Generated lesson prompt:</span> {prompt.trim() || autoPromptForTitle(titleInput || initialTopic.title)} · New motion direction on every generation</p>
           <div className="field-grid">
             <label>Series<input value={draft.series} onChange={(event) => update('series', event.target.value)} /></label>
             <label>Creator<input value={draft.creator} onChange={(event) => update('creator', event.target.value)} /></label>
@@ -195,7 +204,7 @@ function App() {
             <Player component={FrontendInMotion} inputProps={inputProps} durationInFrames={draft.durationInSeconds * draft.fps} compositionWidth={draft.width} compositionHeight={draft.height} fps={draft.fps} controls style={{width: '100%', maxHeight: '70vh', aspectRatio: '4 / 5'}} />
           </div>
           <div className="status-row"><span className="status-dot" />{status}</div>
-          <div className="tips"><span>Tip</span> Use the prompt to create a topic, then edit the title and headline before exporting.</div>
+          <div className="tips"><span>Tip</span> Every generation creates fresh lesson copy, colors, layout, and animation direction. Export the JSON to render that exact version with Remotion.</div>
         </section>
       </div>
       <footer><span>{draft.series} · {draft.tagline}</span><span>Runs locally in your browser · No API key required</span></footer>

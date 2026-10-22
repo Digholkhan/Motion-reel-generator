@@ -12,7 +12,7 @@ A React + TypeScript + Remotion educational video generator for Md Mohiuddin. It
 - Exports the edited topic as JSON for repeatable rendering.
 - Renders H.264 MP4 locally with the same composition used by the browser preview.
 
-The prompt generator is intentionally deterministic and dependency-free. It creates a strong editable starting point; it does not pretend to be an AI model. To add AI-generated lesson copy later, replace `topicFromPrompt()` in [`src/app/App.tsx`](./src/app/App.tsx) with a server-side provider call and keep the API key on the server.
+The prompt generator is dependency-free and creates a validated storyboard on every generation. [`src/storyboard.ts`](./src/storyboard.ts) classifies intent, chooses scene types, and emits narrative purpose, composition, motion, transition, and asset-element instructions. Remotion consumes those instructions through configurable scene renderers; it is not selecting a finished topic template. The current planner is local and deterministic rather than an LLM call. A server-side provider can replace `createStoryboard()` while preserving the `Storyboard` contract and keeping API keys off the client.
 
 ## 1. Run locally
 
@@ -123,6 +123,17 @@ Vercel deployment reliably hosts the browser editor and preview. MP4 rendering s
 - Keep Vercel as the UI/API layer and move the render job to a queue-backed worker.
 
 The current app does not claim to upload files or render MP4s on Vercel. That is deliberate: a browser `blob:` URL and an ephemeral serverless filesystem are not durable production media storage. Add Vercel Blob, S3, Cloudinary, or another object store before implementing remote render jobs.
+
+## Prompt-aware storyboard architecture
+
+The old composition used seven fixed time windows and always rendered the same HTML/CSS/JavaScript lesson layout. The new flow is:
+
+1. The editor sends the prompt to `createStoryboard()`.
+2. The planner selects supported visual types (`particle`, `diagram`, `code`, `timeline`, or `kinetic-typography`) from topic intent and preserves a stable seed.
+3. `validateStoryboard()` rejects unsupported types, invalid durations, unsafe fps, and invalid motion values, then calculates cumulative scene timing.
+4. `FrontendInMotion` selects the active scene from the calculated timeline and passes its composition, animation, elements, and transition to the matching renderer.
+
+Space prompts use layered particle/orbit scenes, phishing prompts use threat diagrams and timelines, and programming prompts use progressive code reveals. The same storyboard and seed produce the same frame output. The planner is intentionally local so the app works without an API key; an AI planner can be added server-side without changing the renderer contract.
 
 ## Audio
 
