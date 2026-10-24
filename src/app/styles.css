@@ -57,6 +57,10 @@ input::placeholder, textarea::placeholder { color: #63718a; }
 .secondary-button { grid-row: span 2; padding: 11px 13px; background: #182946; color: #a9ccf7; }
 .player-wrap { display: flex; justify-content: center; border-radius: 13px; overflow: hidden; background: #050812; }
 .player-wrap > div { max-width: 560px; }
+.preview-empty { display: grid; place-items: center; align-content: center; gap: 12px; width: 100%; min-height: 520px; padding: 32px; color: #9aa8c7; text-align: center; }
+.preview-empty strong { color: #f3f6ff; font-size: 20px; }
+.cooking-spinner { width: 42px; height: 42px; border: 3px solid #263452; border-top-color: #168bff; border-right-color: #8b5cf6; border-radius: 50%; animation: cooking-spin 0.9s linear infinite; }
+@keyframes cooking-spin { to { transform: rotate(360deg); } }
 .live-dot { color: #6be6aa; letter-spacing: .07em; }
 .status-row { justify-content: flex-start; gap: 8px; padding-top: 16px; color: #91a0ba; font-size: 12px; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #5be19b; box-shadow: 0 0 12px #5be19b; }

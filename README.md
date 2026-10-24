@@ -14,6 +14,55 @@ A React + TypeScript + Remotion educational video generator for Md Mohiuddin. It
 
 The prompt generator is dependency-free and creates a validated storyboard on every generation. [`src/storyboard.ts`](./src/storyboard.ts) classifies intent, chooses scene types, and emits narrative purpose, composition, motion, transition, and asset-element instructions. Remotion consumes those instructions through configurable scene renderers; it is not selecting a finished topic template. The current planner is local and deterministic rather than an LLM call. A server-side provider can replace `createStoryboard()` while preserving the `Storyboard` contract and keeping API keys off the client.
 
+## AI Creative Director API
+
+The application includes a server-side `POST /api/storyboard/generate` endpoint backed by Google's official `@google/genai` SDK. It requests schema-constrained JSON from Gemini, fits the scene durations to the requested duration, and runs the result through `validateStoryboard()` before returning it. Provider output is treated as data only; it is never executed as HTML or JavaScript.
+
+Required server environment variables:
+
+```text
+GEMINI_API_KEY=your-server-only-key
+GEMINI_MODEL=gemini-3.5-flash-lite
+STORYBOARD_PROVIDER=gemini
+```
+
+Optional:
+
+```text
+API_PORT=8787
+FRONTEND_ORIGIN=http://localhost:5173
+```
+
+For local development, start both the API and Vite together:
+
+```powershell
+npm run dev
+```
+
+Vite proxies `/api` to `http://localhost:8787`. On Vercel, [`api/storyboard/generate.ts`](./api/storyboard/generate.ts) is deployed as a serverless function automatically. Do not expose `GEMINI_API_KEY` through `VITE_` variables or commit it.
+
+Copy `.env.example` to `.env` and add your Gemini key only to the server environment. `gemini-3.5-flash-lite` is the configured cost-effective model and supports structured JSON output for this integration. Set `STORYBOARD_PROVIDER=mock` to exercise the API without network calls or API charges; the UI labels mock results explicitly. If the local API is not running, the browser uses the existing local planner and clearly reports that it is in offline mode. Gemini errors are shown to the user and do not silently replace an approved storyboard.
+
+Exact setup:
+
+```powershell
+npm install
+Copy-Item .env.example .env
+# Edit .env locally; never paste or commit GEMINI_API_KEY.
+npm run typecheck
+npm test
+```
+
+`npm run dev` starts both services:
+
+```powershell
+npm run dev
+```
+
+The Express server listens on `http://localhost:8787`; Vite serves the UI at `http://localhost:5173` and proxies `/api`. The server applies JSON body limits, CORS restricted to `FRONTEND_ORIGIN`, a 10-request-per-minute limiter, provider timeouts, and validation errors.
+
+For a no-charge smoke test, set `STORYBOARD_PROVIDER=mock`, start the API, and submit the React, space, and cybersecurity prompts in the UI. The status will say **Mock storyboard generated and validated**, not Gemini. Restore `STORYBOARD_PROVIDER=gemini` for real generation. The backend retries transient Gemini `429` and `503` capacity responses up to twice with a short backoff.
+
 ## 1. Run locally
 
 Install Node.js 20 or newer, then open PowerShell in the project folder:
@@ -28,15 +77,12 @@ Open `http://localhost:5173`.
 
 In the app:
 
-1. Edit the topic title. After a short pause, the complete lesson configuration and preview regenerate automatically.
-2. Leave the prompt empty if you want the app to create one automatically from the title.
-3. Enter a prompt when you want to control the lesson direction. Prompt changes also regenerate automatically; the button is available for an immediate regeneration.
-4. Edit the opening headline, series, or creator if needed.
-5. Upload a licensed MP3/WAV/M4A file for the live preview.
-6. Scrub or play the preview.
-7. Click **Save topic JSON** when the configuration is ready.
+1. Enter the complete video direction in the prompt field.
+2. Click **Generate the video**. Typing alone never calls Gemini.
+3. Wait for the validated storyboard and live Remotion preview.
+4. Click **Download video** to render and download the exact validated AI storyboard as an H.264 MP4.
 
-The uploaded music is a browser-local preview. It is not uploaded to a server and disappears when the page is refreshed.
+The browser workflow previews the generated storyboard and **Download video** renders that same validated AI plan on the server as an H.264 MP4. The Gemini key remains server-only.
 
 ## 2. Use Remotion Studio
 
@@ -60,19 +106,11 @@ Output:
 
 The file is exactly 900 frames, 30 seconds, 30fps, 1080×1350, H.264.
 
-## 4. Render a topic created in the web app
+## 4. Server-side video download
 
-After clicking **Save topic JSON**, place the downloaded file in the project root as:
+The **Download video** button sends the validated storyboard to `POST /api/video/render`. The API bundles the existing Remotion composition, renders it with the storyboard as `inputProps`, and streams the resulting H.264 MP4 back to the browser. It does not call Gemini again, so the downloaded file matches the preview's approved storyboard.
 
-`frontend-in-motion-topic.json`
-
-Then render it with Remotion:
-
-```powershell
-npx remotion render src/index.tsx FrontendInMotionEpisode01 frontend-in-motion-custom.mp4 --props=frontend-in-motion-topic.json
-```
-
-If you used uploaded music, put the licensed file in `public/audio/` and change the JSON `musicPath` to a public path such as `/audio/my-track.mp3` before rendering. Temporary browser `blob:` URLs are intentionally removed from downloaded JSON because they cannot work in a CLI render.
+For production, run the API on a machine with a compatible Chromium environment and enough CPU, memory, and temporary disk space for Remotion rendering. Keep the API behind authentication or a deployment-level quota if the app is public.
 
 ## 5. Push to GitHub
 
@@ -87,7 +125,7 @@ git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
 git push -u origin main
 ```
 
-Do not commit private music, API keys, or generated MP4 files. The included `.gitignore` excludes `node_modules`, `dist`, MP4 files, and `public/audio/*`.
+Do not commit private music, API keys, or generated MP4 files. The included `.gitignore` excludes `node_modules`, `.env` files, `dist`, MP4 files, and `public/audio/*`.
 
 ## 6. Deploy the editor to Vercel
 
@@ -124,6 +162,8 @@ Vercel deployment reliably hosts the browser editor and preview. MP4 rendering s
 
 The current app does not claim to upload files or render MP4s on Vercel. That is deliberate: a browser `blob:` URL and an ephemeral serverless filesystem are not durable production media storage. Add Vercel Blob, S3, Cloudinary, or another object store before implementing remote render jobs.
 
+For production, deploy the frontend and API behind HTTPS, set `GEMINI_API_KEY`, `GEMINI_MODEL`, `FRONTEND_ORIGIN`, and `STORYBOARD_PROVIDER=gemini` in server-side environment settings, and do not use `VITE_GEMINI_API_KEY`. The included Vercel function can serve the API; for a conventional Node deployment run `npm run api` behind a reverse proxy. Add a shared rate limiter such as Redis-backed limiting when deploying more than one API instance.
+
 ## Prompt-aware storyboard architecture
 
 The old composition used seven fixed time windows and always rendered the same HTML/CSS/JavaScript lesson layout. The new flow is:
@@ -143,6 +183,7 @@ The composition always renders successfully with no audio. When `topic.audio.mus
 
 ```powershell
 npm run typecheck
+npm test
 npm run build
 npm run render
 ```

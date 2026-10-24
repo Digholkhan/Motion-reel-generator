@@ -3,6 +3,7 @@ import type {TopicConfig, Scene} from './topic';
 export type VisualType = 'kinetic-typography' | 'code' | 'diagram' | 'data' | 'particle' | 'timeline';
 export type MotionType = 'reveal' | 'orbit' | 'draw' | 'drift' | 'slide' | 'pulse' | 'zoom';
 export type TransitionType = 'cut' | 'fade' | 'wipe' | 'zoom';
+export type LayoutType = 'center-stack' | 'split-screen' | 'editor' | 'orbit' | 'network' | 'timeline' | 'dashboard';
 
 export type ScenePlan = Omit<Scene, 'id' | 'durationInSeconds'> & {
   id: string;
@@ -12,6 +13,7 @@ export type ScenePlan = Omit<Scene, 'id' | 'durationInSeconds'> & {
   visualDescription: string;
   composition: {
     align: 'center' | 'left' | 'right';
+    layout: LayoutType;
     accent: string;
     scale: number;
     depth: number;
@@ -40,6 +42,7 @@ export type Storyboard = {
 };
 
 const visualTypes: VisualType[] = ['kinetic-typography', 'code', 'diagram', 'data', 'particle', 'timeline'];
+const layoutTypes: LayoutType[] = ['center-stack', 'split-screen', 'editor', 'orbit', 'network', 'timeline', 'dashboard'];
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export function validateStoryboard(storyboard: Storyboard): Storyboard {
@@ -53,6 +56,9 @@ export function validateStoryboard(storyboard: Storyboard): Storyboard {
   let total = 0;
   for (const scene of storyboard.scenes) {
     if (!visualTypes.includes(scene.visualType)) throw new Error(`Unsupported visual type: ${scene.visualType}`);
+    if (!scene.composition.layout || !layoutTypes.includes(scene.composition.layout)) {
+      scene.composition.layout = scene.visualType === 'code' ? 'editor' : scene.visualType === 'particle' ? 'orbit' : scene.visualType === 'diagram' ? 'network' : scene.visualType === 'timeline' ? 'timeline' : 'center-stack';
+    }
     if (!Number.isFinite(scene.durationInSeconds) || scene.durationInSeconds <= 0) {
       throw new Error(`Scene ${scene.id} has an invalid duration.`);
     }
@@ -99,7 +105,7 @@ export function createStoryboard(prompt: string, base: TopicConfig, seed = hash(
     visualType,
     narrativePurpose: index === 0 ? 'Establish the subject and promise' : index === 3 ? 'Resolve the message with a memorable takeaway' : 'Build the narrative with a concrete visual relationship',
     visualDescription: isSpace ? 'Layered celestial objects with depth and camera travel' : isSecurity ? 'A topic-specific threat path with actionable emphasis' : 'Prompt-specific explanation with configurable visual hierarchy',
-    composition: {align: index % 2 ? 'left' : 'center', accent: palette[(index + 1) % palette.length], scale: 1 + ((seed + index) % 10) / 100, depth: index % 3},
+    composition: {align: index % 2 ? 'left' : 'center', layout: visualType === 'particle' ? 'orbit' : visualType === 'code' ? 'editor' : visualType === 'diagram' ? 'network' : visualType === 'timeline' ? 'timeline' : index % 3 === 0 ? 'split-screen' : 'center-stack', accent: palette[(index + 1) % palette.length], scale: 1 + ((seed + index) % 10) / 100, depth: index % 3},
     animation: {motion: motions[index], intensity: 0.8 + ((seed + index) % 5) / 10, reveal: visualType === 'code' ? 'line' : 'shape'},
     transitionOut: {type: index === 3 ? 'fade' : (['cut', 'wipe', 'zoom'] as TransitionType[])[(seed + index) % 3], durationInSeconds: 0.35},
     elements: isSpace ? ['planet', 'nebula', 'orbit'] : isSecurity ? ['email', 'link', 'warning'] : ['headline', 'concept', 'example'],

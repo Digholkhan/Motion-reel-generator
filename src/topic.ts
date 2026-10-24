@@ -10,6 +10,7 @@ export type Scene = {
 export type TopicConfig = {
   title: string;
   prompt?: string;
+  storyboard?: import('./storyboard').Storyboard;
   durationInSeconds: number;
   fps: number;
   width: number;
